@@ -3,26 +3,20 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local Window = Rayfield:CreateWindow({
    Name = "Plot ESP Menu",
    LoadingTitle = "Plot Tools",
-   LoadingSubtitle = "ESP Tools",
-   ConfigurationSaving = { Enabled = false }
+   LoadingSubtitle = "RemainingTime + Rarity ESP",
+   ConfigurationSaving = {
+      Enabled = false
+   }
 })
 
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
 local RunService = game:GetService("RunService")
-local Camera = workspace.CurrentCamera
 
--- VARIABILI
 local espEnabledTime = false
-local espEnabledRarity = false
-local espEnabledBest = false
+local espEnabledRaritySecret = false
+local espEnabledRarityMythic = false
 local espTimeObjects = {}
 local espRarityObjects = {}
 
-local bestTarget, bestValue = nil, 0
-local line, box, label
-
--- FUNZIONI UTILI
 local function tryGetText(inst)
     local ok, res = pcall(function()
         if inst and (inst:IsA("TextLabel") or inst:IsA("TextBox")) then
@@ -45,24 +39,6 @@ local function parseRemainingText(txt)
     return { unlocked = false, display = txt }
 end
 
-local function parseNumber(text)
-    text = string.upper(text)
-    local mult = 1
-    if text:find("K") then
-        mult = 1e3
-        text = text:gsub("K", "")
-    elseif text:find("M") then
-        mult = 1e6
-        text = text:gsub("M", "")
-    elseif text:find("B") then
-        mult = 1e9
-        text = text:gsub("B", "")
-    end
-    local num = tonumber(text) or 0
-    return num * mult
-end
-
--- ESP REMAINING TIME
 local function createTimeESP(plot)
     if espTimeObjects[plot] then return end
     local purchases = plot:FindFirstChild("Purchases")
@@ -77,6 +53,7 @@ local function createTimeESP(plot)
     if not sourceLabel or not sourceLabel:IsA("TextLabel") then return end
 
     local esp = Instance.new("BillboardGui")
+    esp.Name = "RemainingTimeESP"
     esp.AlwaysOnTop = true
     esp.Size = UDim2.new(0, 300, 0, 80)
     esp.StudsOffset = Vector3.new(0, 6, 0)
@@ -92,7 +69,12 @@ local function createTimeESP(plot)
     textLabel.Parent = esp
 
     esp.Parent = main
-    espTimeObjects[plot] = { Billboard = esp, SourceLabel = sourceLabel, TextLabel = textLabel }
+
+    espTimeObjects[plot] = {
+        Billboard = esp,
+        SourceLabel = sourceLabel,
+        TextLabel = textLabel
+    }
 end
 
 local function removeTimeESP(plot)
@@ -102,7 +84,6 @@ local function removeTimeESP(plot)
     end
 end
 
--- ESP RARITY SECRET
 local function createRarityESP(podium)
     if espRarityObjects[podium] then return end
     local base = podium:FindFirstChild("Base")
@@ -117,6 +98,7 @@ local function createRarityESP(podium)
     if not rarityLabel or not rarityLabel:IsA("TextLabel") then return end
 
     local esp = Instance.new("BillboardGui")
+    esp.Name = "RarityESP"
     esp.AlwaysOnTop = true
     esp.Size = UDim2.new(0, 250, 0, 60)
     esp.StudsOffset = Vector3.new(0, 7, 0)
@@ -129,10 +111,16 @@ local function createRarityESP(podium)
     textLabel.TextScaled = true
     textLabel.TextStrokeTransparency = 0
     textLabel.TextColor3 = Color3.fromRGB(50, 50, 50)
+    textLabel.Text = ""
     textLabel.Parent = esp
 
     esp.Parent = podium
-    espRarityObjects[podium] = { Billboard = esp, SourceLabel = rarityLabel, TextLabel = textLabel }
+
+    espRarityObjects[podium] = {
+        Billboard = esp,
+        SourceLabel = rarityLabel,
+        TextLabel = textLabel
+    }
 end
 
 local function removeRarityESP(podium)
@@ -142,82 +130,9 @@ local function removeRarityESP(podium)
     end
 end
 
--- ESP BEST ANIMAL
-local function findBest()
-    bestTarget, bestValue = nil, 0
-    local plots = workspace:WaitForChild("Plots")
-    for _, plot in ipairs(plots:GetChildren()) do
-        local podiums = plot:FindFirstChild("AnimalPodiums")
-        if podiums then
-            for _, podium in ipairs(podiums:GetChildren()) do
-                local overhead = podium:FindFirstChild("Base")
-                    and podium.Base:FindFirstChild("Spawn")
-                    and podium.Base.Spawn:FindFirstChild("Attachment")
-                    and podium.Base.Spawn.Attachment:FindFirstChild("AnimalOverhead")
-                if overhead then
-                    local genLabel = overhead:FindFirstChild("Generation")
-                    local nameLabel = overhead:FindFirstChild("DisplayName")
-                    if genLabel and genLabel:IsA("TextLabel") and nameLabel then
-                        local value = parseNumber(genLabel.Text)
-                        if value > bestValue then
-                            bestValue = value
-                            bestTarget = { Model = podium.Base, Generation = genLabel.Text, DisplayName = nameLabel.Text }
-                        end
-                    end
-                end
-            end
-        end
-    end
-end
-
-local function createBestESP()
-    line = Drawing.new("Line")
-    line.Color = Color3.fromRGB(0, 255, 0)
-    line.Thickness = 2
-
-    box = Drawing.new("Square")
-    box.Color = Color3.fromRGB(0, 255, 0)
-    box.Thickness = 2
-    box.Filled = false
-    box.Size = Vector2.new(50, 50)
-
-    label = Drawing.new("Text")
-    label.Color = Color3.fromRGB(0, 255, 0)
-    label.Size = 18
-    label.Center = true
-    label.Outline = true
-end
-
-local function removeBestESP()
-    if line then line:Remove() line = nil end
-    if box then box:Remove() box = nil end
-    if label then label:Remove() label = nil end
-end
-
--- TELEPORT ALLA PROPRIA BASE
-local function teleportToMyPlot()
-    local plots = workspace:WaitForChild("Plots")
-    for _, plot in ipairs(plots:GetChildren()) do
-        local sign = plot:FindFirstChild("PlotSign")
-        if sign and sign:FindFirstChild("SurfaceGui") then
-            local frame = sign.SurfaceGui:FindFirstChild("Frame")
-            if frame and frame:FindFirstChild("TextLabel") then
-                if frame.TextLabel.Text == LocalPlayer.Name then
-                    local spawn = plot:FindFirstChild("Spawn")
-                    if spawn then
-                        LocalPlayer.Character:PivotTo(spawn.CFrame + Vector3.new(0, 5, 0))
-                    end
-                end
-            end
-        end
-    end
-end
-
--- RENDER LOOP
 RunService.RenderStepped:Connect(function()
-    -- Time ESP
     if espEnabledTime then
-        for _, data in pairs(espTimeObjects) do
+        for plot, data in pairs(espTimeObjects) do
             local raw = tryGetText(data.SourceLabel)
             local parsed = parseRemainingText(raw)
             if parsed then
@@ -232,106 +147,97 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- Rarity ESP
-    if espEnabledRarity then
-        for _, data in pairs(espRarityObjects) do
-            local txt = tryGetText(data.SourceLabel)
-            if txt and txt:lower() == "secret" then
+    for podium, data in pairs(espRarityObjects) do
+        local txt = tryGetText(data.SourceLabel)
+        if txt then
+            if espEnabledRaritySecret and txt:lower() == "secret" then
                 data.TextLabel.Text = "Secret"
+                data.TextLabel.TextColor3 = Color3.fromRGB(40, 40, 40)
+            elseif espEnabledRarityMythic and txt:lower() == "mythic" then
+                data.TextLabel.Text = "Mythic"
+                data.TextLabel.TextColor3 = Color3.fromRGB(150, 50, 200) -- viola acceso
             else
                 data.TextLabel.Text = ""
             end
         end
     end
-
-    -- Best ESP
-    if espEnabledBest then
-        findBest()
-        if bestTarget and bestTarget.Model and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            local hrp = LocalPlayer.Character.HumanoidRootPart
-            local pos, onScreen = Camera:WorldToViewportPoint(bestTarget.Model.Position)
-            if onScreen then
-                local playerPos = Camera:WorldToViewportPoint(hrp.Position)
-                line.From = Vector2.new(playerPos.X, playerPos.Y)
-                line.To = Vector2.new(pos.X, pos.Y)
-                line.Visible = true
-
-                box.Position = Vector2.new(pos.X - 25, pos.Y - 25)
-                box.Visible = true
-
-                label.Text = bestTarget.DisplayName .. " | " .. bestTarget.Generation
-                label.Position = Vector2.new(pos.X, pos.Y - 40)
-                label.Visible = true
-            else
-                line.Visible = false
-                box.Visible = false
-                label.Visible = false
-            end
-        end
-    end
 end)
 
--- MENU
-local tab = Window:CreateTab("ESP")
+local function toggleTimeESP(state)
+    espEnabledTime = state
+    if espEnabledTime then
+        local plotsFolder = workspace:WaitForChild("Plots")
+        for _, plot in ipairs(plotsFolder:GetChildren()) do
+            createTimeESP(plot)
+        end
+        plotsFolder.ChildAdded:Connect(function(plot)
+            task.wait(0.5)
+            if espEnabledTime then
+                createTimeESP(plot)
+            end
+        end)
+    else
+        for plot, _ in pairs(espTimeObjects) do
+            removeTimeESP(plot)
+        end
+    end
+end
 
-tab:CreateToggle({
+local function toggleRarityESPSecret(state)
+    espEnabledRaritySecret = state
+    if espEnabledRaritySecret or espEnabledRarityMythic then
+        local plotsFolder = workspace:WaitForChild("Plots")
+        for _, plot in ipairs(plotsFolder:GetChildren()) do
+            local podiums = plot:FindFirstChild("AnimalPodiums")
+            if podiums then
+                for _, podium in ipairs(podiums:GetChildren()) do
+                    createRarityESP(podium)
+                end
+                podiums.ChildAdded:Connect(function(podium)
+                    task.wait(0.5)
+                    if espEnabledRaritySecret or espEnabledRarityMythic then
+                        createRarityESP(podium)
+                    end
+                end)
+            end
+        end
+    else
+        for podium, _ in pairs(espRarityObjects) do
+            removeRarityESP(podium)
+        end
+    end
+end
+
+local function toggleRarityESPMythic(state)
+    espEnabledRarityMythic = state
+    toggleRarityESPSecret(espEnabledRaritySecret) -- usa la stessa funzione di init/clean
+end
+
+local espTab = Window:CreateTab("ESP")
+
+espTab:CreateToggle({
     Name = "RemainingTime ESP",
     CurrentValue = false,
     Flag = "espTime",
     Callback = function(state)
-        espEnabledTime = state
-        if espEnabledTime then
-            for _, plot in ipairs(workspace.Plots:GetChildren()) do
-                createTimeESP(plot)
-            end
-        else
-            for plot in pairs(espTimeObjects) do
-                removeTimeESP(plot)
-            end
-        end
+        toggleTimeESP(state)
     end
 })
 
-tab:CreateToggle({
+espTab:CreateToggle({
     Name = "Secret Rarity ESP",
     CurrentValue = false,
-    Flag = "espRarity",
+    Flag = "espRaritySecret",
     Callback = function(state)
-        espEnabledRarity = state
-        if espEnabledRarity then
-            for _, plot in ipairs(workspace.Plots:GetChildren()) do
-                local podiums = plot:FindFirstChild("AnimalPodiums")
-                if podiums then
-                    for _, podium in ipairs(podiums:GetChildren()) do
-                        createRarityESP(podium)
-                    end
-                end
-            end
-        else
-            for podium in pairs(espRarityObjects) do
-                removeRarityESP(podium)
-            end
-        end
+        toggleRarityESPSecret(state)
     end
 })
 
-tab:CreateToggle({
-    Name = "Best Brainrot ESP",
+espTab:CreateToggle({
+    Name = "Mythic Rarity ESP",
     CurrentValue = false,
-    Flag = "espBest",
+    Flag = "espRarityMythic",
     Callback = function(state)
-        espEnabledBest = state
-        if espEnabledBest then
-            createBestESP()
-        else
-            removeBestESP()
-        end
-    end
-})
-
-tab:CreateButton({
-    Name = "Teleport alla mia base",
-    Callback = function()
-        teleportToMyPlot()
+        toggleRarityESPMythic(state)
     end
 })
